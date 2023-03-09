@@ -15,20 +15,21 @@ void envia_cmd(uint8_t);	//função para enviar um comando no barramento
 uint8_t recebe_cmd(void);	//função para receber um comando
 void buzzer(void);			//função de ativação do buzzer
 
+#define comunicacao (1 << 2)
+
 int main(void)
 {
 	Utility_Init();	//inicializa funções úteis
 
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOEEN;	//habilita o clock do GPIOA e GPIOE
 
-	GPIOA->ODR    |= (1<<7) | (1<<6) | 1;		//inicia com leds e buzzer desligados e linha COM em idle
-	GPIOA->OTYPER |= 1 << 2;					//saída open-drain em PA2
-	GPIOA->PUPDR  |= 0b01 << 4;					//habilita pull-up em PA2
-	GPIOA->MODER  |= (0b01 << 14) | (0b01 << 12) | (0b01 << 2) | (0b01 << 4) ; 	//pinos PA2, PA1, PA6 e PA7 no modo saída
-	GPIOE->PUPDR  |= (0b01 << 8) | (0b01 << 6);								//habilita pull-up em PE4 e PE3
-	GPIOA->MODER  &= ~(0b11);
-	GPIOA->PUPDR  |= (0b10); // habilita pull down em PAO
-
+	GPIOA->ODR |= (1<<7) | (1<<6) | comunicacao;		//inicia com leds e buzzer desligados e linha COM em idle
+	GPIOA->OTYPER |= comunicacao;						//saída open-drain em PA0
+	GPIOA->MODER |= (0b01 << 14) | (0b01 << 12) | (0b01 << 2) | (0b01 << 4) ; 	//pinos PA0, PA1, PA6 e PA7 no modo saída
+	GPIOE->PUPDR |= (0b01 << 8) | (0b01 << 6) ;					//habilita pull-up em PE4 e PE3
+	GPIOA->PUPDR |= (0b01 << 4);
+	GPIOA->MODER &= ~(0b11);
+	GPIOA->PUPDR |= (0b10);
 	Delay_ms(100);	//aguarda sinais estabilizarem
 
 	while(1)	//loop infinito
@@ -49,7 +50,7 @@ int main(void)
 				while(!(GPIOE->IDR & (1 << 3)));	//aguarda o botão ser solto
 			}
 
-			if(!(GPIOA->IDR & 1))	//verifica se houve start bit comunicação
+			if(!(GPIOA->IDR & comunicacao))	//verifica se houve start bit comunicação
 			{
 				uint8_t recebido = recebe_cmd();	//recebe o comando
 				if(recebido == 0)
@@ -67,16 +68,16 @@ int main(void)
 //Função para envio de um comando
 void envia_cmd(uint8_t dado)
 	{
-		GPIOA->ODR &= ~1;	//start bit
+		GPIOA->ODR &= ~comunicacao;	//start bit
 		Delay_us(10);		//aguarda tempo do start bit
 		if(dado & 1)		//envia o bit do comando
-			GPIOA->ODR |= 1;
+			GPIOA->ODR |= comunicacao;
 		else
-			GPIOA->ODR &= ~1;
+			GPIOA->ODR &= ~comunicacao;
 		Delay_us(10);			//aguarda o tempo do bit
-		GPIOA->ODR |= 1;		//libera
+		GPIOA->ODR |= comunicacao;		//libera
 		Delay_us(5);
-		if((GPIOA->IDR & 1)) {
+		if((GPIOA->IDR & comunicacao)) {
 			if(dado == 0){
 				GPIOA->ODR ^= 1 << 6;
 			}else{
@@ -84,7 +85,7 @@ void envia_cmd(uint8_t dado)
 			}
 		}
 		Delay_us(5);			//aguarda o tempo do bit
-		GPIOA->ODR |= 1;		//stop bit
+		GPIOA->ODR |= comunicacao;		//stop bit
 		Delay_us(10);			//tempo do stop bit
 }
 
@@ -93,23 +94,23 @@ uint8_t recebe_cmd(void)
 {
 	uint8_t dado_recebido;
 	Delay_us(5);			//aguarda metade do start bit
-	if(!(GPIOA->IDR & 1))	//confirma que houve um start bit
+	if(!(GPIOA->IDR & comunicacao))	//confirma que houve um start bit
 	{
 
 		Delay_us(10);		//aguarda o tempo do bit
-		if(GPIOA->IDR & 1)
+		if(GPIOA->IDR & comunicacao)
 			dado_recebido = 1;
 		else
 			dado_recebido = 0;
 
 		Delay_us(5);
-		GPIOA->ODR &= ~1;
+		GPIOA->ODR &= ~comunicacao;
 
 		Delay_us(10); //tempo de liberação
-		GPIOA->ODR |= 1;
+		GPIOA->ODR |= comunicacao;
 
 		Delay_us(10);			//aguarda para fazer leitura do stop bit
-		if((GPIOA->IDR & 1))	//confirma que houve um stop bit
+		if((GPIOA->IDR & comunicacao))	//confirma que houve um stop bit
 		{
 			Delay_us(5);			//aguarda o fim do tempo do stop bit
 			return dado_recebido;	//retorna o dado recebido
