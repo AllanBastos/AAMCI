@@ -24,12 +24,12 @@ int main(void)
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOEEN;	//habilita o clock do GPIOA e GPIOE
 
 	GPIOA->ODR |= (1<<7) | (1<<6) | comunicacao;		//inicia com leds e buzzer desligados e linha COM em idle
-	GPIOA->OTYPER |= comunicacao;						//saída open-drain em PA0
-	GPIOA->MODER |= (0b01 << 14) | (0b01 << 12) | (0b01 << 2) | (0b01 << 4) ; 	//pinos PA0, PA1, PA6 e PA7 no modo saída
+	GPIOA->OTYPER |= comunicacao;						//saída open-drain em PA2
+	GPIOA->MODER |= (0b01 << 14) | (0b01 << 12) | (0b01 << 2) | (0b01 << 4) | (0b01 << 16); 	//pinos PA7  PA6, PA1, PA2 e PA8 no modo saída
 	GPIOE->PUPDR |= (0b01 << 8) | (0b01 << 6) ;					//habilita pull-up em PE4 e PE3
-	GPIOA->PUPDR |= (0b01 << 4);
-	GPIOA->MODER &= ~(0b11);
-	GPIOA->PUPDR |= (0b10);
+	GPIOA->PUPDR |= (0b01 << 4);                                //Habilita o resistor de pull-up em PA2
+	GPIOA->MODER &= ~(0b11);									//Habilita o PA0 Como entrada;
+	GPIOA->PUPDR |= (0b10);										//Habilita o resistor de pull down em PA0
 	Delay_ms(100);	//aguarda sinais estabilizarem
 
 	while(1)	//loop infinito
@@ -50,6 +50,13 @@ int main(void)
 				while(!(GPIOE->IDR & (1 << 3)));	//aguarda o botão ser solto
 			}
 
+			if((GPIOA->IDR & (1))){  //Verifica se PA0 foi pressionado
+				envia_cmd(2);						//envia o valor 2
+				buzzer();							//sinaliza o fim do envio
+				Delay_ms(75);						//filtro de bouncing da chave
+				while((GPIOA->IDR & 1));
+			}
+
 			if(!(GPIOA->IDR & comunicacao))	//verifica se houve start bit comunicação
 			{
 				uint8_t recebido = recebe_cmd();	//recebe o comando
@@ -61,6 +68,9 @@ int main(void)
 				{
 					GPIOA->ODR ^= 1 << 7;			//alterna o estado do LED em PA7
 				}
+				if(recebido == 2){
+					GPIOA->ODR ^= 1 << 8;          //altera o estado do led em PA5
+				}
 			}
 		}
 }
@@ -70,18 +80,33 @@ void envia_cmd(uint8_t dado)
 	{
 		GPIOA->ODR &= ~comunicacao;	//start bit
 		Delay_us(10);		//aguarda tempo do start bit
-		if(dado & 1)		//envia o bit do comando
-			GPIOA->ODR |= comunicacao;
-		else
+
+		if(dado == 0)	{
+			GPIOA->ODR  &= ~comunicacao; //envia o bit do comando
+			Delay_us(10);
+			GPIOA->ODR  &= ~comunicacao;
+		}
+		else if(dado == 1){
 			GPIOA->ODR &= ~comunicacao;
+			Delay_us(10);
+			GPIOA->ODR  |= comunicacao;
+
+		}else if(dado == 2){
+			GPIOA->ODR  |= comunicacao;
+			Delay_us(10);
+			GPIOA->ODR &= ~comunicacao;
+		}
+
 		Delay_us(10);			//aguarda o tempo do bit
 		GPIOA->ODR |= comunicacao;		//libera
 		Delay_us(5);
 		if((GPIOA->IDR & comunicacao)) {
 			if(dado == 0){
 				GPIOA->ODR ^= 1 << 6;
-			}else{
+			}else if(dado == 1){
 				GPIOA->ODR ^= 1 << 7;
+			}else if(dado == 2){
+				GPIOA->ODR ^= 1 << 8;
 			}
 		}
 		Delay_us(5);			//aguarda o tempo do bit
@@ -97,11 +122,28 @@ uint8_t recebe_cmd(void)
 	if(!(GPIOA->IDR & comunicacao))	//confirma que houve um start bit
 	{
 
+		uint8_t bitA;
+		uint8_t bitB;
 		Delay_us(10);		//aguarda o tempo do bit
 		if(GPIOA->IDR & comunicacao)
-			dado_recebido = 1;
+			bitA = 1;
 		else
+			bitA = 0;
+
+		Delay_us(10);		//aguarda o tempo do bit
+		if(GPIOA->IDR & comunicacao)
+			bitB = 1;
+		else
+			bitB = 0;
+
+		if(!bitA && !bitB){
 			dado_recebido = 0;
+		}else if(!bitA && bitB){
+			dado_recebido = 1;
+		}else if(bitA && !bitB){
+			dado_recebido = 2;
+		}
+
 
 		Delay_us(5);
 		GPIOA->ODR &= ~comunicacao;
