@@ -12,6 +12,7 @@
 #include "Utility.h"
 
 
+int flag = 0;
 
 void alternarLed1(){
 	GPIOA->ODR ^= 1 << 6;			//alterna o estado do LED em PA6
@@ -31,8 +32,9 @@ int botao2(){
 
 enviaCMD(int dado){
 	USART1->DR = dado;
-
-	if(USART1->DR != 2){
+	flag = 0;
+	Delay_ms(15);
+	if(flag == 0){
 		if(dado == 0){
 			alternarLed1();
 		}else if(dado == 1){
@@ -41,6 +43,8 @@ enviaCMD(int dado){
 	}
 
 }
+
+
 
 void USART1_IRQHandler(void)
 	{
@@ -51,6 +55,8 @@ void USART1_IRQHandler(void)
 			alternarLed1();
 		}else if(recebido == 1){
 			alternarLed2();
+		}else if(2){
+			flag = 1;
 		}
 
 	}
@@ -61,18 +67,18 @@ int main(void)
 	USART1_Init();
 
 
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOEEN;	//habilita o clock do GPIOA e GPIOE
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOEEN;
 
-	GPIOA->ODR |= (1<<7) | (1<<6);		//inicia com leds e buzzer desligados e linha COM em idle
-	GPIOA->MODER |= (0b01 << 14) | (0b01 << 12);	//pinos PA7  PA6, PA1, PA2 e PA8 no modo saída
-	GPIOE->PUPDR |= (0b01 << 8) | (0b01 << 6);					//habilita pull-up em PE4 e PE3
+	GPIOA->ODR |= (1<<7) | (1<<6);
+	GPIOA->MODER |= (0b01 << 14) | (0b01 << 12);
+	GPIOE->PUPDR |= (0b01 << 8) | (0b01 << 6);
 
 	Delay_ms(100);	//aguarda sinais estabilizarem
 
 
 	while(1)	//loop infinito
 		{
-
+			flag = 0;
 			if(botao1())
 			{
 				enviaCMD(0);
@@ -88,3 +94,4 @@ int main(void)
 			}
 		}
 }
+
