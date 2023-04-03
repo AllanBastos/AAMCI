@@ -33,7 +33,7 @@ int botao2(){
 enviaCMD(int dado){
 	USART1->DR = dado;
 	flag = 0;
-	Delay_ms(15);
+	Delay_ms(100);
 	if(flag == 0){
 		if(dado == 0){
 			alternarLed1();
@@ -48,16 +48,21 @@ enviaCMD(int dado){
 
 void USART1_IRQHandler(void)
 	{
-		char recebido = USART1->DR;
-		USART1->DR = 2;
+		int recebido = USART1->DR;
 //		__io_putchar(recebido);	//lê o dado e reenvia pela USART1
 		if(recebido == 0){
 			alternarLed1();
-		}else if(recebido == 1){
+			USART1->DR = 2;
+		}
+		if(recebido == 1){
 			alternarLed2();
-		}else if(2){
+			USART1->DR = 2;
+		}
+		if(recebido == 2){
 			flag = 1;
 		}
+
+
 
 	}
 
@@ -81,6 +86,7 @@ int main(void)
 			flag = 0;
 			if(botao1())
 			{
+				flag = 0;
 				enviaCMD(0);
 				Delay_ms(10);
 				while(botao1());
@@ -88,10 +94,10 @@ int main(void)
 
 			if(botao2())
 			{
+				flag = 0;
 				enviaCMD(1);
 				Delay_ms(10);
 				while(botao2());
 			}
 		}
 }
-
